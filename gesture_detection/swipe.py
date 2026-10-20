@@ -5,7 +5,7 @@ positions = [(100, 200, 5.0),
 currentTime= 5.2
 lastSwipeTime = 3.5
 cooldown = 1.0
-
+#swipes register when fast and purposeful, cooldown of 1s
 if len(positions)<2:
     print("Not Enough Positions")
 else:
