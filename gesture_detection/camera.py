@@ -2,6 +2,7 @@ import cv2
 import time
 from hand_tracking import processImage, options, vision
 from swipe import detectSwipe
+from media_control import next_track, previous_track
 camera = cv2.VideoCapture(0)
 positions = []
 lastSwipeTime = 0
@@ -28,6 +29,10 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
             direction, lastSwipeTime = detectSwipe(positions, currentTime, lastSwipeTime, cooldown)
             if direction is not None:
                 print(f"Swipe detected: {direction}")
+                if direction == "Left":
+                    previous_track()
+                elif direction == "Right":
+                    next_track()
                 positions.clear()
         else:
             positions.clear()
