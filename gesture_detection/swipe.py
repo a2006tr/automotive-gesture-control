@@ -1,21 +1,14 @@
-#create position list
-positions = [(100, 200, 5.0),
-    (150, 200, 5.1),
-    (250, 200, 5.2)]
-currentTime= 5.2
-lastSwipeTime = 3.5
-cooldown = 1.0
 #swipes register when fast and purposeful, cooldown of 1s
-if len(positions)<2:
-    print("Not Enough Positions")
-else:
-    distance = positions[0][0] - positions[-1][0]
-    timeElapsed = positions[-1][2] - positions[0][2]
-    if distance >= 100 and timeElapsed <= 0.5 and currentTime - lastSwipeTime >= cooldown:
-        print("Swipe Left")
-        lastSwipeTime = currentTime
-    elif distance <= -100 and timeElapsed <= 0.5 and currentTime - lastSwipeTime >= cooldown:
-        print("Swipe Right")
-        lastSwipeTime = currentTime
+def detectSwipe(positions, currentTime, lastSwipeTime, cooldown):
+    if len(positions)<2:
+        return None, lastSwipeTime
     else:
-        print("No Swipe")
+        distance = positions[-1][0] - positions[0][0]
+        timeElapsed = positions[-1][2] - positions[0][2]
+        verticalDistance = abs(positions[0][1] - positions[-1][1])
+        if distance >= 100 and 0 < timeElapsed <= 0.5 and currentTime - lastSwipeTime >= cooldown and verticalDistance < 50:
+            return "Left", currentTime
+        elif distance <= -100 and 0 < timeElapsed <= 0.5 and currentTime - lastSwipeTime >= cooldown and verticalDistance < 50:
+            return "Right", currentTime
+        else:
+            return None, lastSwipeTime
