@@ -7,3 +7,5 @@ def volume_up():
     subprocess.Popen(['osascript', '-e', 'tell application "Spotify" to set sound volume to (sound volume + 5)'])
 def volume_down():
     subprocess.Popen(['osascript', '-e', 'tell application "Spotify" to set sound volume to (sound volume - 2)'])
+def playPause():
+    subprocess.Popen(['osascript', '-e', 'tell application "Spotify" to playpause'])

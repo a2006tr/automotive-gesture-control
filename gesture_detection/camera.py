@@ -2,8 +2,9 @@ import cv2
 import time
 from hand_tracking import processImage, options, vision
 from swipe import detectSwipe
-from media_control import next_track, previous_track, volume_down, volume_up
+from media_control import next_track, previous_track, volume_down, volume_up, playPause
 from volume import detectPinch
+from playback import detectPlaybackGesture
 camera = cv2.VideoCapture(0)
 positions = []
 pinchYHistory = []
@@ -11,6 +12,9 @@ lastSwipeTime = 0
 pinchStartY = None
 cooldown = 2.0
 isPinching = False
+#for playpause
+isTouching = False
+releaseStartTime = None
 with vision.HandLandmarker.create_from_options(options) as landmarker:
     while True:
         captured, frame = camera.read()
@@ -27,8 +31,17 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
                 cv2.circle(frame, (x, y), 4, (0, 255, 0), -1)
         if len(mpResult.hand_landmarks) > 0:
             hand = mpResult.hand_landmarks[0]
+            wasTouching = isTouching
+            isTouching = detectPlaybackGesture(hand, isTouching)
+            if wasTouching and not isTouching:
+                releaseStartTime = time.monotonic()
+            if isTouching:
+                releaseStartTime = None
+            if releaseStartTime is not None and time.monotonic() - releaseStartTime >= 0.5:
+                print("TOGGLE PLAYBACK")
+                playPause()
+                releaseStartTime = None
             isPinching = detectPinch(hand, isPinching)
-
             if isPinching:
                 if pinchStartY is None:
                     pinchStartY = hand[8].y
@@ -64,9 +77,9 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
                 positions.append((wristXPixels, wristYPixels, currentTime))
                 while positions and currentTime - positions[0][2] > 0.5:
                     positions.pop(0)
-                direction, lastSwipeTime = detectSwipe(positions, currentTime, lastSwipeTime, cooldown)
+                direction, lastSwipeTime, distance = detectSwipe(positions, currentTime, lastSwipeTime, cooldown)
                 if direction is not None:
-                    print(f"Swipe detected: {direction}")
+                    print(f"Swipe detected: {direction}, Distance: {distance}")
                     if direction == "Left":
                         previous_track()
                     elif direction == "Right":
