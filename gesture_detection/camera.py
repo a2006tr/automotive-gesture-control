@@ -28,6 +28,7 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
     while True:
         if piCheck:
             frame = camera.capture_array()
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             captured = True
         else:
             captured, frame = camera.read()
