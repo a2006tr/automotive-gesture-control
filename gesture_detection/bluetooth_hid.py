@@ -13,11 +13,11 @@ gattService = "org.bluez.GattService1"
 gattCharacteristic = "org.bluez.GattCharacteristic1"
 gattDescriptor = "org.bluez.GattDescriptor1"
 gattManager = dbus.Interface(adapter, "org.bluez.GattManager1")
-playPause = 0x00CD
-nextTrack = 0x00B5
-previousTrack = 0x00B6
-volumeUp = 0x00E9
-volumeDown = 0x00EA
+playPause = 0x01
+nextTrack = 0x02
+previousTrack = 0x04
+volumeUp = 0x08
+volumeDown = 0x10
 
 def registerSuccess():
     print("Advertisement registered successfully")
@@ -32,14 +32,14 @@ def gattError(error):
     print(f"Failed to register GATT application: {error}")
 
 def makeReport(usage):
-    return usage.to_bytes(2, byteorder="little")
+    return [usage]
 
 class Advertisement(dbus.service.Object):
     def __init__(self, bus, path):
         super().__init__(bus, path)
         self.adType = "peripheral"
         self.localName = "gesturePi"
-        self.serviceUUIDs =["1812"]
+        self.serviceUUIDs =["1812", "180A", "180F"]
 
     @dbus.service.method(
         "org.freedesktop.DBus.Properties",
@@ -202,19 +202,29 @@ class ReportMap(Characteristic):
     )
     def ReadValue(self, options):
         return [
-            0x05, 0x0C,        # Usage Page (Consumer)
-            0x09, 0x01,        # Usage (Consumer Control)
-            0xA1, 0x01,        # Collection (Application)
+            0x05, 0x0C,
+            0x09, 0x01,
+            0xA1, 0x01,
+            0x85, 0x01,
 
-            0x15, 0x00,        # Logical Minimum (0)
-            0x26, 0xFF, 0x03,  # Logical Maximum (1023)
-            0x19, 0x00,        # Usage Minimum (0)
-            0x2A, 0xFF, 0x03,  # Usage Maximum (1023)
-            0x75, 0x10,        # Report Size (16 bits)
-            0x95, 0x01,        # Report Count (1)
-            0x81, 0x00,        # Input (Data, Array, Absolute)
+            0x15, 0x00,
+            0x25, 0x01,
 
-            0xC0               # End Collection
+            0x09, 0xCD,
+            0x09, 0xB5,
+            0x09, 0xB6,
+            0x09, 0xE9,
+            0x09, 0xEA,
+
+            0x75, 0x01,
+            0x95, 0x05,
+            0x81, 0x02,
+
+            0x75, 0x03,
+            0x95, 0x01,
+            0x81, 0x03,
+
+            0xC0
         ]
 
 class HIDControlPoint(Characteristic):
@@ -260,12 +270,12 @@ class ReportReference(Descriptor):
         out_signature="ay"
     )
     def ReadValue(self, options):
-        return [0x00, 0x01]
+        return [0x01, 0x01]
 
 class Report(Characteristic):
     def __init__(self, bus, path, service):
         super().__init__(bus, path, "2A4D", service, ["read", "notify"])
-        self.value = [0x00, 0x00]
+        self.value = [0x00]
         self.notifying = False
 
     @dbus.service.method(
@@ -303,11 +313,13 @@ class Report(Characteristic):
         if not self.notifying:
             return
         self.value = list(makeReport(usage))
+        print("press:", self.value)
         self.PropertiesChanged(gattCharacteristic, {"Value": dbus.Array(self.value, signature="y")}, [])
         GLib.timeout_add(50, self.releaseReport)
 
     def releaseReport(self):
-        self.value = [0x00, 0x00]
+        self.value = [0x00]
+        print("release:", self.value)
 
         self.PropertiesChanged(
             gattCharacteristic,
@@ -322,7 +334,37 @@ class Report(Characteristic):
 
         return False
 
+class PnPID(Characteristic):
+    def __init__(self, bus, path, service):
+        super().__init__(bus, path, "2A50", service, ["read"])
+
+    @dbus.service.method(
+        gattCharacteristic,
+        in_signature="a{sv}",
+        out_signature="ay"
+    )
+    def ReadValue(self, options):
+        return [
+            0x01,
+            0xFF, 0xFF,
+            0x01, 0x00,
+            0x01, 0x00
+        ]
+
+class BatteryLevel(Characteristic):
+    def __init__(self, bus, path, service):
+        super().__init__(bus, path, "2A19", service, ["read"])
+
+    @dbus.service.method(
+        gattCharacteristic,
+        in_signature="a{sv}",
+        out_signature="ay"
+    )
+    def ReadValue(self, options):
+        return [100]
+
 applicationTest = Application(bus, "/com/gesture")
+
 serviceTest = Service(bus, "/com/gesture/service0", "1812")
 applicationTest.services.append(serviceTest)
 serviceTest.characteristics.append(HIDInformation(bus, "/com/gesture/service0/char0", serviceTest))
@@ -338,6 +380,18 @@ reportTest.descriptors.append(
     ReportReference(bus, "/com/gesture/service0/char3/desc0", reportTest)
 )
 
+deviceInfoService = Service(bus, "/com/gesture/service1", "180A")
+applicationTest.services.append(deviceInfoService)
+deviceInfoService.characteristics.append(
+    PnPID(bus, "/com/gesture/service1/char0", deviceInfoService)
+)
+
+batteryService = Service(bus, "/com/gesture/service2", "180F")
+applicationTest.services.append(batteryService)
+batteryService.characteristics.append(
+    BatteryLevel(bus, "/com/gesture/service2/char0", batteryService)
+)
+
 gattManager.RegisterApplication(
     "/com/gesture",
     {},
@@ -345,4 +399,12 @@ gattManager.RegisterApplication(
     error_handler=gattError
 )
 
+def testPlayPause():
+    if reportTest.notifying:
+        print("Sending play/pause")
+        reportTest.sendReport(playPause)
+        return False
+    return True
+
+GLib.timeout_add(1000, testPlayPause)
 mainLoop.run()
