@@ -1,11 +1,20 @@
 import cv2
 import time
+import platform
+piCheck = platform.system() == "Linux"
+if piCheck:
+    from picamera2 import Picamera2
 from hand_tracking import processImage, options, vision
 from swipe import detectSwipe
 from media_control import next_track, previous_track, volume_down, volume_up, playPause
 from volume import detectPinch
 from playback import detectPlaybackGesture
-camera = cv2.VideoCapture(0)
+
+if piCheck:
+    camera = Picamera2()
+    camera.start()
+else:
+    camera = cv2.VideoCapture(0)
 positions = []
 pinchYHistory = []
 lastSwipeTime = 0
@@ -17,7 +26,11 @@ isTouching = False
 releaseStartTime = None
 with vision.HandLandmarker.create_from_options(options) as landmarker:
     while True:
-        captured, frame = camera.read()
+        if piCheck:
+            frame = camera.capture_array()
+            captured = True
+        else:
+            captured, frame = camera.read()
         if not captured:
             print("Failed to capture image")
             break
@@ -95,5 +108,8 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
         cv2.imshow("Car Gesture Control", frame)
         if cv2.waitKey(1) == ord('q'):
             break
-camera.release()
+if piCheck:
+    camera.stop()
+else:
+    camera.release()
 cv2.destroyAllWindows()
