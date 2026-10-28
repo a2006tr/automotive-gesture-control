@@ -12,6 +12,7 @@ from playback import detectPlaybackGesture
 
 if piCheck:
     camera = Picamera2()
+    camera.set_controls({"FrameRate": 120})
     camera.start()
 else:
     camera = cv2.VideoCapture(0)
@@ -106,9 +107,9 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
             isPinching = False
             pinchStartY = None
             pinchYHistory.clear()
-        cv2.imshow("Car Gesture Control", frame)
-        if cv2.waitKey(1) == ord('q'):
-            break
+        #cv2.imshow("Car Gesture Control", frame)
+        #if cv2.waitKey(1) == ord('q'):
+        #    break
 if piCheck:
     camera.stop()
 else:

@@ -1,5 +1,6 @@
 import dbus
 import dbus.service
+import threading
 from gi.repository import GLib
 from dbus.mainloop.glib import DBusGMainLoop
 DBusGMainLoop(set_as_default=True)
@@ -13,11 +14,11 @@ gattService = "org.bluez.GattService1"
 gattCharacteristic = "org.bluez.GattCharacteristic1"
 gattDescriptor = "org.bluez.GattDescriptor1"
 gattManager = dbus.Interface(adapter, "org.bluez.GattManager1")
-playPause = 0x01
-nextTrack = 0x02
-previousTrack = 0x04
-volumeUp = 0x08
-volumeDown = 0x10
+playPauseCode = 0x01
+nextTrackCode = 0x02
+previousTrackCode = 0x04
+volumeUpCode = 0x08
+volumeDownCode = 0x10
 
 def registerSuccess():
     print("Advertisement registered successfully")
@@ -313,13 +314,12 @@ class Report(Characteristic):
         if not self.notifying:
             return
         self.value = list(makeReport(usage))
-        print("press:", self.value)
         self.PropertiesChanged(gattCharacteristic, {"Value": dbus.Array(self.value, signature="y")}, [])
         GLib.timeout_add(50, self.releaseReport)
+        return False
 
     def releaseReport(self):
         self.value = [0x00]
-        print("release:", self.value)
 
         self.PropertiesChanged(
             gattCharacteristic,
@@ -398,13 +398,9 @@ gattManager.RegisterApplication(
     reply_handler=gattSuccess,
     error_handler=gattError
 )
+def startBluetooth():
+    bluetoothThread = threading.Thread(target=mainLoop.run, daemon=True)
+    bluetoothThread.start()
 
-def testPlayPause():
-    if reportTest.notifying:
-        print("Sending play/pause")
-        reportTest.sendReport(playPause)
-        return False
-    return True
-
-GLib.timeout_add(1000, testPlayPause)
-mainLoop.run()
+def sendMediaControl(usage):
+    GLib.idle_add(reportTest.sendReport, usage)
